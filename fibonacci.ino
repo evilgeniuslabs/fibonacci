@@ -6,6 +6,10 @@ FASTLED_USING_NAMESPACE;
 #include "application.h"
 #include "math.h"
 
+SYSTEM_MODE(SEMI_AUTOMATIC);
+
+int offlinePin = D7;
+
 // allow us to use itoa() in this scope
 extern char* itoa(int a, char* buffer, unsigned char radix);
 
@@ -64,19 +68,18 @@ const PatternAndNameList patterns = {
   { showSolidColor,         "Solid Color" }
 };
 
+int patternCount = ARRAY_SIZE(patterns);
+
 // variables exposed via Particle cloud API (Spark Core is limited to 10)
 int brightness = 32;
-int patternCount = ARRAY_SIZE(patterns);
 int patternIndex = 0;
-String patternName = "Pride";
+String patternNames = "";
 int power = 1;
-char variableValue[32] = "";
-
-// variables exposed via the variableValue variable, via Particle Cloud API
 int r = 0;
 int g = 0;
 int b = 255;
 
+// variables exposed via the variableValue variable, via Particle Cloud API
 int noiseSpeedX = 0; // 1 for a very slow moving effect, or 60 for something that ends up looking like water.
 int noiseSpeedY = 0;
 int noiseSpeedZ = 1;
@@ -93,16 +96,13 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
 CRGB solidColor = CRGB(r, g, b);
 
-int offlinePin = D7;
-
-SYSTEM_MODE(SEMI_AUTOMATIC);
-
 CRGBPalette16 IceColors_p = CRGBPalette16(CRGB::Black, CRGB::Blue, CRGB::Aqua, CRGB::White);
 
 uint8_t paletteIndex = 0;
 
 // List of palettes to cycle through.
-CRGBPalette16 palettes[] = {
+CRGBPalette16 palettes[] =
+{
   RainbowColors_p,
   RainbowStripeColors_p,
   CloudColors_p,
@@ -123,7 +123,8 @@ CRGBPalette16 targetPalette = palettes[paletteIndex];
 // 20-120 is better for deployment
 #define SECONDS_PER_PALETTE 20
 
-void setup() {
+void setup()
+{
     FastLED.addLeds<LED_TYPE,DATA_PIN,CLK_PIN>(leds, NUM_LEDS);
     FastLED.setCorrection(Typical8mmPixel);
     FastLED.setBrightness(brightness);
@@ -168,23 +169,36 @@ void setup() {
     solidColor = CRGB(r, b, g);
 
     Particle.function("patternIndex", setPatternIndex); // sets the current pattern index, changes to the pattern with the specified index
-    Particle.function("pNameCursor", movePatternNameCursor); // moves the pattern name cursor to the specified index, allows getting a list of pattern names
     Particle.function("variable", setVariable); // sets the value of a variable, args are name:value
     Particle.function("varCursor", moveVariableCursor);
 
     Particle.variable("power", power);
     Particle.variable("brightness", brightness);
-    Particle.variable("patternCount", patternCount);
     Particle.variable("patternIndex", patternIndex);
-    Particle.variable("patternName", patternName);
+    Particle.variable("r", r);
+    Particle.variable("g", g);
+    Particle.variable("b", b);
     Particle.variable("variable", variableValue);
+
+    patternNames = "[";
+    for(uint8_t i = 0; i < patternCount; i++)
+    {
+      patternNames.concat("\"");
+      patternNames.concat(patterns[i].name);
+      patternNames.concat("\"");
+      if(i < patternCount - 1)
+        patternNames.concat(",");
+    }
+    patternNames.concat("]");
+    Particle.variable("patternNames", patternNames);
 
     noiseX = random16();
     noiseY = random16();
     noiseZ = random16();
 }
 
-void loop() {
+void loop()
+{
     if(power < 1) {
         fill_solid(leds, NUM_LEDS, CRGB::Black);
         FastLED.show();
@@ -323,7 +337,8 @@ int setVariable(String args) {
     return -1;
 }
 
-int setPower(String args) {
+int setPower(String args)
+{
     power = args.toInt();
     if(power < 0)
         power = 0;
@@ -370,19 +385,6 @@ int setPatternIndex(String args)
     EEPROM.write(1, patternIndex);
 
     return patternIndex;
-}
-
-int movePatternNameCursor(String args)
-{
-    int index = args.toInt();
-    if(index < 0)
-        index = 0;
-    else if (index >= patternCount)
-        index = patternCount - 1;
-
-    patternName = patterns[index].name;
-
-    return index;
 }
 
 uint8_t rainbow()
@@ -436,31 +438,58 @@ uint8_t bpm()
   return 8;
 }
 
-uint8_t juggle() {
-  // eight colored dots, weaving in and out of sync with each other
-  fadeToBlackBy( leds, NUM_LEDS, 20);
-  byte dothue = 0;
-  for( int i = 0; i < 8; i++) {
-    leds[beatsin16(i+7,0,NUM_LEDS)] |= CHSV(dothue, 200, 255);
-    dothue += 32;
+uint8_t juggle()
+{
+  static uint8_t    numdots =   4; // Number of dots in use.
+  static uint8_t   faderate =   2; // How long should the trails be. Very low value = longer trails.
+  static uint8_t     hueinc =  255 / numdots - 1; // Incremental change in hue between each dot.
+  static uint8_t    thishue =   0; // Starting hue.
+  static uint8_t     curhue =   0; // The current hue
+  static uint8_t    thissat = 255; // Saturation of the colour.
+  static uint8_t thisbright = 255; // How bright should the LED/display be.
+  static uint8_t   basebeat =   5; // Higher = faster movement.
+
+  static uint8_t lastSecond =  99;  // Static variable, means it's only defined once. This is our 'debounce' variable.
+  uint8_t secondHand = (millis() / 1000) % 30; // IMPORTANT!!! Change '30' to a different value to change duration of the loop.
+
+  if (lastSecond != secondHand) { // Debounce to make sure we're not repeating an assignment.
+    lastSecond = secondHand;
+    switch(secondHand) {
+      case  0: numdots = 1; basebeat = 20; hueinc = 16; faderate = 2; thishue = 0; break; // You can change values here, one at a time , or altogether.
+      case 10: numdots = 4; basebeat = 10; hueinc = 16; faderate = 8; thishue = 128; break;
+      case 20: numdots = 8; basebeat =  3; hueinc =  0; faderate = 8; thishue=random8(); break; // Only gets called once, and not continuously for the next several seconds. Therefore, no rainbows.
+      case 30: break;
+    }
   }
 
-  return 8;
+  // Several colored dots, weaving in and out of sync with each other
+  curhue = thishue; // Reset the hue values.
+  fadeToBlackBy(leds, NUM_LEDS, faderate);
+  for( int i = 0; i < numdots; i++) {
+    //beat16 is a FastLED 3.1 function
+    leds[beatsin16(basebeat+i+numdots,0,NUM_LEDS)] += CHSV(gHue + curhue, thissat, thisbright);
+    curhue += hueinc;
+  }
+
+  return 0;
 }
 
-uint8_t fire() {
+uint8_t fire()
+{
     heatMap(HeatColors_p, true);
 
     return 30;
 }
 
-uint8_t water() {
+uint8_t water()
+{
     heatMap(IceColors_p, false);
 
     return 30;
 }
 
-uint8_t showSolidColor() {
+uint8_t showSolidColor()
+{
     fill_solid(leds, NUM_LEDS, solidColor);
 
     return 30;
@@ -524,7 +553,8 @@ uint8_t radialPaletteShift()
 const uint8_t spiral1Count = 13;
 const uint8_t spiral1Length = 7;
 
-uint8_t spiral1Arms[spiral1Count][spiral1Length] = {
+uint8_t spiral1Arms[spiral1Count][spiral1Length] =
+{
     { 0, 14, 27, 40, 53, 66, 84 },
     { 1, 15, 28, 41, 54, 67, 76 },
     { 2, 16, 29, 42, 55, 68, 85 },
@@ -543,7 +573,8 @@ uint8_t spiral1Arms[spiral1Count][spiral1Length] = {
 const uint8_t spiral2Count = 21;
 const uint8_t spiral2Length = 4;
 
-uint8_t spiral2Arms[spiral2Count][spiral2Length] = {
+uint8_t spiral2Arms[spiral2Count][spiral2Length] =
+{
     { 0, 26, 51, 73 },
     { 1, 14, 39, 64 },
     { 15, 27, 52, 74 },
@@ -568,7 +599,8 @@ uint8_t spiral2Arms[spiral2Count][spiral2Length] = {
 };
 
 template <size_t armCount, size_t armLength>
-void fillSpiral(uint8_t (&spiral)[armCount][armLength], bool reverse, CRGBPalette16 palette) {
+void fillSpiral(uint8_t (&spiral)[armCount][armLength], bool reverse, CRGBPalette16 palette)
+{
     fill_solid(leds, NUM_LEDS, ColorFromPalette(palette, 0, 255, LINEARBLEND));
 
     byte offset = 255 / armCount;
@@ -601,13 +633,15 @@ void fillSpiral(uint8_t (&spiral)[armCount][armLength], bool reverse, CRGBPalett
     }
 }
 
-uint8_t spiral1() {
+uint8_t spiral1()
+{
     fillSpiral(spiral1Arms, false, currentPalette);
 
     return 0;
 }
 
-uint8_t spiral2() {
+uint8_t spiral2()
+{
     fillSpiral(spiral2Arms, true, currentPalette);
 
     return 0;
@@ -733,7 +767,8 @@ uint8_t verticalPaletteBlend()
     return 15;
 }
 
-const uint8_t coordsX[NUM_LEDS] = {
+const uint8_t coordsX[NUM_LEDS] =
+{
     135, 180, 236, 255, 253, 210, 143, 98, 37, 7,
     0, 32, 64, 93, 160, 200, 240, 243, 234, 182,
     116, 75, 28, 6, 15, 58, 120, 179, 214, 237,
@@ -746,7 +781,8 @@ const uint8_t coordsX[NUM_LEDS] = {
     112, 155, 165, 119, 90, 100, 130, 137, 142, 116
 };
 
-const uint8_t coordsY[NUM_LEDS] = {
+const uint8_t coordsY[NUM_LEDS] =
+{
     255, 250, 201, 132, 86, 28, 3, 0, 37, 73,
     146, 209, 242, 246, 242, 229, 174, 106, 64, 21,
     12, 18, 65, 102, 171, 220, 239, 224, 204, 145,
@@ -759,11 +795,13 @@ const uint8_t coordsY[NUM_LEDS] = {
     160, 144, 113, 94, 112, 132, 148, 127, 107, 116
 };
 
-CRGB scrollingHorizontalWashColor( uint8_t x, uint8_t y, unsigned long timeInMillis) {
+CRGB scrollingHorizontalWashColor( uint8_t x, uint8_t y, unsigned long timeInMillis)
+{
     return CHSV( x + (timeInMillis / 100), 255, 255);
 }
 
-uint8_t horizontalRainbow() {
+uint8_t horizontalRainbow()
+{
     unsigned long t = millis();
 
     for(uint8_t i = 0; i < NUM_LEDS; i++) {
@@ -773,11 +811,13 @@ uint8_t horizontalRainbow() {
     return 0;
 }
 
-CRGB scrollingVerticalWashColor( uint8_t x, uint8_t y, unsigned long timeInMillis) {
+CRGB scrollingVerticalWashColor( uint8_t x, uint8_t y, unsigned long timeInMillis)
+{
     return CHSV( y + (timeInMillis / 100), 255, 255);
 }
 
-uint8_t verticalRainbow() {
+uint8_t verticalRainbow()
+{
     unsigned long t = millis();
 
     for(uint8_t i = 0; i < NUM_LEDS; i++) {
@@ -787,11 +827,13 @@ uint8_t verticalRainbow() {
     return 0;
 }
 
-CRGB scrollingDiagonalWashColor( uint8_t x, uint8_t y, unsigned long timeInMillis) {
+CRGB scrollingDiagonalWashColor( uint8_t x, uint8_t y, unsigned long timeInMillis)
+{
     return CHSV( x + y + (timeInMillis / 100), 255, 255);
 }
 
-uint8_t diagonalRainbow() {
+uint8_t diagonalRainbow()
+{
     unsigned long t = millis();
 
     for(uint8_t i = 0; i < NUM_LEDS; i++) {
@@ -801,7 +843,8 @@ uint8_t diagonalRainbow() {
     return 0;
 }
 
-uint8_t noise() {
+uint8_t noise()
+{
     for(uint8_t i = 0; i < NUM_LEDS; i++) {
         uint8_t x = coordsX[i];
         uint8_t y = coordsY[i];
@@ -1081,7 +1124,8 @@ uint8_t life()
     return 60;
 }
 
-void heatMap(CRGBPalette16 palette, bool up) {
+void heatMap(CRGBPalette16 palette, bool up)
+{
     fill_solid(leds, NUM_LEDS, CRGB::Black);
 
     // Add entropy to random number generator; we use a lot of it.
@@ -1336,7 +1380,8 @@ CRGB makeDarker( const CRGB& color, fract8 howMuchDarker)
 // cycles and about 100 bytes of flash program memory.
 uint8_t  directionFlags[ (NUM_LEDS+7) / 8];
 
-bool getPixelDirection( uint16_t i) {
+bool getPixelDirection( uint16_t i)
+{
   uint16_t index = i / 8;
   uint8_t  bitNum = i & 0x07;
 
@@ -1344,7 +1389,8 @@ bool getPixelDirection( uint16_t i) {
   return (directionFlags[index] & andMask) != 0;
 }
 
-void setPixelDirection( uint16_t i, bool dir) {
+void setPixelDirection( uint16_t i, bool dir)
+{
   uint16_t index = i / 8;
   uint8_t  bitNum = i & 0x07;
 

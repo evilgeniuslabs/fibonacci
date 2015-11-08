@@ -10,7 +10,7 @@ app.config(function ($httpProvider) {
   $httpProvider.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded;';
 });
 
-app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, variableService) {
+app.controller('MainCtrl', function ($scope, $http, $timeout, variableService) {
   $scope.brightness = "255";
   $scope.busy = false;
   $scope.power = 1;
@@ -23,7 +23,7 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
   $scope.noiseSpeedZ = 0;
   $scope.noiseScale = 0;
   $scope.powerText = "On";
-  $scope.status = "Please enter your access token.";
+  $scope.status = "Please enter your access token:";
   $scope.disconnected = false;
   $scope.accessToken = "";
   $scope.isDeviceSelected = false;
@@ -36,12 +36,8 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
   $scope.onSelectedDeviceChange = function() {
     $scope.isDeviceSelected = $scope.device != null;
 
-    var devicePatterns = localStorage["deviceId" + $scope.device.id + "patterns"];
-
-    if(devicePatterns === undefined)
-      $scope.patterns = null;
-    else
-      $scope.patterns = JSON.parse(devicePatterns);
+    if($scope.device != null && $scope.device.connected == true)
+      $scope.connect();
   }
 
   $scope.onSelectedPatternChange = function() {
@@ -92,7 +88,6 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
 
   if (Modernizr.localstorage) {
     $scope.accessToken = localStorage["accessToken"];
-    // $('#inputAccessToken').scope().$apply();
 
     if ($scope.accessToken && $scope.accessToken != "") {
       $scope.status = "";
@@ -102,7 +97,7 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
 
   $scope.save = function () {
     localStorage["accessToken"] = $scope.accessToken;
-    $scope.status = "Saved access token.";
+    $scope.status = "Saved access token";
 
     $scope.getDevices();
   }
@@ -127,7 +122,7 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
     })
 
     .then(function (data) {
-      return variableService.getExtendedVariableValue("r", $scope.device.id, $scope.accessToken);
+      return variableService.getVariableValue("r", $scope.device.id, $scope.accessToken);
     })
     .then(function (response) {
       $scope.r = response.data.return_value;
@@ -135,7 +130,7 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
     })
 
     .then(function (data) {
-      return variableService.getExtendedVariableValue("g", $scope.device.id, $scope.accessToken);
+      return variableService.getVariableValue("g", $scope.device.id, $scope.accessToken);
     })
     .then(function (response) {
       $scope.g = response.data.return_value;
@@ -143,7 +138,7 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
     })
 
     .then(function (data) {
-      return variableService.getExtendedVariableValue("b", $scope.device.id, $scope.accessToken);
+      return variableService.getVariableValue("b", $scope.device.id, $scope.accessToken);
     })
     .then(function (response) {
       $scope.b = response.data.return_value;
@@ -182,12 +177,13 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
       $scope.status = 'Loaded noise scale';
     })
 
-    .then(function (data) {
-      if($scope.patterns === undefined)
-        $scope.getPatterns();
-      else
-        $scope.getPatternIndex();
-    });
+    .then(function () {
+      $scope.getPatterns();
+    })
+
+    .then(function () {
+      $scope.getPatternIndex();
+    })
   }
 
   $scope.getPower = function () {
@@ -434,8 +430,6 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
         $scope.busy = false;
         $scope.patternIndex = data.result;
         $scope.pattern = $scope.patterns[$scope.patternIndex];
-        $scope.disconnected = false;
-        $scope.status = 'Ready';
       }).
       error(function (data, status, headers, config) {
         $scope.busy = false;
@@ -443,39 +437,22 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
       });
   };
 
-  $scope.getPatternNames = function (index) {
-    if (index < $scope.patternCount) {
-      var promise = patternService.getPatternName(index, $scope.device.id, $scope.accessToken);
-      promise.then(
-        function (payload) {
-          $scope.patterns.push({ index: index, name: payload.data.result });
-          $scope.status = 'Loaded pattern name ' + index;
-          $scope.getPatternNames(index + 1);
-        });
-    }
-    else {
-      $scope.busy = false;
-      $scope.getPatternIndex();
-
-      localStorage["deviceId" + $scope.device.id + "patterns"] = JSON.stringify($scope.patterns);
-    }
-  };
-
   $scope.getPatterns = function () {
     // $scope.busy = true;
 
-    // get the pattern count
-    var promise = $http.get('https://api.particle.io/v1/devices/' + $scope.device.id + '/patternCount?access_token=' + $scope.accessToken);
+    // get the pattern name list
+    var promise = $http.get('https://api.particle.io/v1/devices/' + $scope.device.id + '/patternNames?access_token=' + $scope.accessToken);
 
-    // get the name of the first pattern
-    // getPatternNames will then recursively call itself until all pattern names are retrieved
     promise.then(
       function (payload) {
-        $scope.patternCount = payload.data.result;
-        $scope.patterns = [];
-        $scope.status = 'Loaded pattern count';
+        var patternNames = JSON.parse(payload.data.result);
 
-        $scope.getPatternNames(0);
+        for(var i = 0; i < patternNames.length; i++) {
+            $scope.patterns.push({ index: i, name: patternNames[i] });
+        }
+
+        $scope.patternCount = patternNames.length;
+        $scope.status = 'Loaded patterns';
       },
       function (errorPayload) {
         $scope.busy = false;
@@ -501,23 +478,6 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, patternService, va
 	      $scope.busy = false;
 	    });
   };
-});
-
-app.factory('patternService', function ($http) {
-  return {
-    getPatternName: function (index, deviceId, accessToken) {
-      return $http({
-        method: 'POST',
-        url: 'https://api.particle.io/v1/devices/' + deviceId + '/pNameCursor',
-        data: { access_token: accessToken, args: index },
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      })
-      .then(
-      function (payload) {
-        return $http.get('https://api.particle.io/v1/devices/' + deviceId + '/patternName?access_token=' + accessToken);
-      });
-    }
-  }
 });
 
 app.factory('variableService', function ($http) {

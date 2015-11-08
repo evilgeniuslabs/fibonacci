@@ -1,19 +1,17 @@
-# Fibonacci Lamp
+# Fibonacci
 
 [Demo Videos](https://www.youtube.com/watch?v=E0JwAUGXpuo&index=3&list=PLUYGVM-2vDxLknPGYbSdxxwOq1qUHfaos):
 
 [![Demo Videos](http://img.youtube.com/vi/E0JwAUGXpuo/0.jpg)](https://www.youtube.com/watch?v=E0JwAUGXpuo&index=3&list=PLUYGVM-2vDxLknPGYbSdxxwOq1qUHfaos)
 
-Build your own, or buy one from Evil Genius Labs: http://www.evilgeniuslabs.org
+Built with [100 x WS2801 RGB LEDs](https://www.adafruit.com/products/322), controlled with a [Particle Photon](https://store.particle.io/?product=particle-photon) using the [FastLED library](https://github.com/FastLED/FastLED).
 
-Created using a Spark Core, 100 x WS2801 RGB LEDs, and the FastLED library.
+Fully open-source, and programmable over Wi-Fi or micro USB cable.
 
-12mm Diffused Thin Digital RGB LED Pixels (Strand of 25) - WS2801: http://www.adafruit.com/product/322
+Build your own, or buy one (finished or kit) from [Evil Genius Labs](http://www.evilgeniuslabs.org): http://www.evilgeniuslabs.org
 
-Spark Core: http://www.seeedstudio.com/depot/Spark-Core-with-Chip-Antenna-p-1495.html
+Controlled via a [web app](http://evilgeniuslabs.org/fibonacci) over Wi-Fi, and/or a wireless infrared remote control.
 
-FastLED: https://github.com/FastLED/FastLED
+Wi-Fi Remote Control App: http://evilgeniuslabs.org/fibonacci
 
-Build pics, videos, and details: https://goo.gl/photos/PKdywS4g8Ngv1umD8
-
-Wi-Fi Remote Control App: https://jasoncoon.github.io/fibonacci
+Build pics, videos, and more details: https://goo.gl/photos/PKdywS4g8Ngv1umD8
