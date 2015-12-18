@@ -96,6 +96,7 @@ int power = 1;
 int r = 0;
 int g = 0;
 int b = 255;
+char variableValue[32] = "";
 
 // variables exposed via the variableValue variable, via Particle Cloud API
 int noiseSpeedX = 0; // 1 for a very slow moving effect, or 60 for something that ends up looking like water.
@@ -319,6 +320,9 @@ int setVariable(String args) {
         patternIndex = patternCount - 1;
         return b;
     }
+    else if (args.startsWith("c:")) { // c:255,255,255
+      return setColor(args.substring(2));
+    }
     else if (args.startsWith("nsx:")) {
         noiseSpeedX = args.substring(4).toInt();
         if(noiseSpeedX < 0)
@@ -382,6 +386,35 @@ int setBrightness(String args)
     return brightness;
 }
 
+int setColor(String args)
+{
+  char inputStr[12];
+  args.toCharArray(inputStr, 12);
+
+  char *p = strtok(inputStr, ",");
+  r = atoi(p);
+
+  p = strtok(NULL,",");
+  g = atoi(p);
+
+  p = strtok(NULL,",");
+  b = atoi(p);
+
+  p = strtok(NULL,",");
+
+  solidColor.r = r;
+  solidColor.g = g;
+  solidColor.b = b;
+
+  patternIndex = patternCount - 1;
+
+  EEPROM.write(2, r);
+  EEPROM.write(3, g);
+  EEPROM.write(4, b);
+
+  return 0;
+}
+
 byte parseByte(String args) {
     int c = args.toInt();
     if(c < 0)
@@ -404,6 +437,8 @@ int setPatternIndex(String args)
 
     return patternIndex;
 }
+
+// Patterns from FastLED example DemoReel100: https://github.com/FastLED/FastLED/blob/master/examples/DemoReel100/DemoReel100.ino
 
 uint8_t rainbow()
 {
@@ -513,6 +548,7 @@ uint8_t showSolidColor()
     return 30;
 }
 
+// Pride2015 by Mark Kriegsman: https://gist.github.com/kriegsman/964de772d64c502760e5
 // This function draws rainbows with an ever-changing,
 // widely-varying set of parameters.
 uint8_t pride()
@@ -743,7 +779,7 @@ void setPixelXY(uint8_t x, uint8_t y, CRGB color)
     for(uint8_t z = 0; z < 2; z++) {
         uint8_t i = xyMap[y][x][z];
 
-        leds[i] = color;
+        if(i < NUM_LEDS) leds[i] = color;
     }
 }
 
@@ -1142,6 +1178,7 @@ uint8_t life()
     return 60;
 }
 
+// based on FastLED example Fire2012WithPalette: https://github.com/FastLED/FastLED/blob/master/examples/Fire2012WithPalette/Fire2012WithPalette.ino
 void heatMap(CRGBPalette16 palette, bool up)
 {
     fill_solid(leds, NUM_LEDS, CRGB::Black);
@@ -1241,7 +1278,7 @@ uint8_t colorWaves()
   return 20;
 }
 
-
+// ColorWavesWithPalettes by Mark Kriegsman: https://gist.github.com/kriegsman/8281905786e8b2632aeb
 // This function draws color waves with an ever-changing,
 // widely-varying set of parameters, using a color palette.
 void colorwaves( CRGB* ledarray, uint16_t numleds, CRGBPalette16& palette)
@@ -1304,6 +1341,8 @@ void palettetest( CRGB* ledarray, uint16_t numleds, const CRGBPalette16& gCurren
   fill_palette( ledarray, numleds, startindex, (256 / NUM_LEDS) + 1, gCurrentPalette, 255, LINEARBLEND);
 }
 
+// based on ColorTwinkles by Mark Kriegsman: https://gist.github.com/kriegsman/5408ecd397744ba0393e
+
 uint8_t cloudTwinkles()
 {
   gCurrentPalette = CloudColors_p; // Blues and whites!
@@ -1313,7 +1352,7 @@ uint8_t cloudTwinkles()
 
 uint8_t rainbowTwinkles()
 {
-  gCurrentPalette = RainbowColors_p; // Blues and whites!
+  gCurrentPalette = RainbowColors_p;
   colortwinkles();
   return 20;
 }
