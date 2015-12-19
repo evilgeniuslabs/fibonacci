@@ -135,7 +135,7 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, variableService) {
       return variableService.getVariableValue("r", $scope.device.id, $scope.accessToken);
     })
     .then(function (response) {
-      $scope.r = response.data.return_value;
+      $scope.r = response.data.result;
       $scope.status = 'Loaded red';
     })
 
@@ -144,7 +144,7 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, variableService) {
       return variableService.getVariableValue("g", $scope.device.id, $scope.accessToken);
     })
     .then(function (response) {
-      $scope.g = response.data.return_value;
+      $scope.g = response.data.result;
       $scope.status = 'Loaded green';
     })
 
@@ -153,7 +153,8 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, variableService) {
       return variableService.getVariableValue("b", $scope.device.id, $scope.accessToken);
     })
     .then(function (response) {
-      $scope.b = response.data.return_value;
+      $scope.b = response.data.result;
+      $scope.color = $scope.rgbToHex($scope.r, $scope.g, $scope.b);
       $scope.status = 'Loaded blue';
     })
 
@@ -298,7 +299,16 @@ app.controller('MainCtrl', function ($scope, $http, $timeout, variableService) {
       g: parseInt(result[2], 16),
       b: parseInt(result[3], 16)
     } : null;
-  }
+  };
+
+  $scope.componentToHex = function(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+  };
+
+  $scope.rgbToHex = function(r, g, b) {
+    return "#" + $scope.componentToHex(r) + $scope.componentToHex(g) + $scope.componentToHex(b);
+  };
 
   $scope.setRGB = function ($) {
     // $scope.busy = true;
