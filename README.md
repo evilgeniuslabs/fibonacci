@@ -12,6 +12,6 @@ Build your own, or buy one (finished or kit) from [Evil Genius Labs](http://www.
 
 Controlled via a [web app](http://evilgeniuslabs.org/fibonacci) over Wi-Fi.
 
-Wi-Fi Remote Control App: https://evilgeniuslabs.github.io/fibonacci
+Wi-Fi Remote Control App: http://evilgeniuslabs.github.io/fibonacci
 
 Build pics, videos, and more details: https://goo.gl/photos/PKdywS4g8Ngv1umD8
